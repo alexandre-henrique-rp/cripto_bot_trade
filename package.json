@@ -1,0 +1,30 @@
+{
+  "name": "cripto",
+  "version": "1.0.0",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+    "start": "node --experimental-strip-types -r dotenv/config index.ts",
+    "dev": "node --watch --experimental-strip-types -r dotenv/config index.ts",
+    "get": "node --experimental-strip-types -r dotenv/config get.ts",
+    "teste": "yarn start && yarn telegran",
+    "telegran": "node --experimental-strip-types -r dotenv/config telegranRequest.ts"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@prisma/client": "^6.5.0",
+    "axios": "^1.8.4",
+    "dotenv": "^16.4.7",
+    "telegraf": "^4.16.3",
+    "ws": "^8.18.1"
+  },
+  "devDependencies": {
+    "@types/node-fetch": "^2.6.12",
+    "@types/ws": "^8.18.0",
+    "prisma": "^6.5.0"
+  },
+  "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
+}

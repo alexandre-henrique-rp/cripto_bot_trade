@@ -1,0 +1,41 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Wallet {
+  id          String    @id @default(cuid())
+  symbol      String?
+  price       Float?
+  quantity    Float?
+  usd         Float?
+  sellPrice   Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime? @updatedAt
+}
+
+model sales {
+  id          String    @id @default(cuid())
+  symbol      String?
+  lucro       Float?
+  createdAt   DateTime  @default(now())
+}
+  
+model profitabilityAt {
+  id          String    @id @default(cuid())
+  taxa        Float?
+  createdAt   DateTime  @default(now())
+}
+
+model config{
+  id          String    @id @default(cuid())
+  symbol      String?
+  taxa_min    Float?
+  taxa_max    Float?
+  createdAt   DateTime  @default(now())
+}
+  

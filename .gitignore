@@ -1,0 +1,13 @@
+node_modules
+# Keep environment variables out of version control
+.env
+yarn.lock
+package-lock.json
+prisma/db
+new
+migrations
+.vscode
+bot/.env
+bot/yarn.lock
+bot/node_modules
+regra.txt
