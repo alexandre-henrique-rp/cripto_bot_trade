@@ -1,12 +1,12 @@
 import crypto from "crypto";
 import axios from "axios";
-
+import { saveErrorNotification } from "../database/errorNotification.ts";
+import AlertTele from "../sms/telegram.ts";
 
 export default async function getSpotWallet() {
   const apiKey = process.env.API_KEY_PROD || "";
   const secretKey = process.env.SECRET_KEY_PROD || "";
   const baseUrl = `${process.env.API_URL_PROD}`;
-
 
   const timestamp = Date.now();
   const queryString = `timestamp=${timestamp}`;
@@ -16,18 +16,17 @@ export default async function getSpotWallet() {
     .digest("hex");
 
   try {
-    const response = await axios.get(
-      `${baseUrl}/v3/account`,
-      {
-        headers: { "X-MBX-APIKEY": apiKey },
-        params: { timestamp, signature },
-      }
-    );
+    const response = await axios.get(`${baseUrl}/v3/account`, {
+      headers: { "X-MBX-APIKEY": apiKey },
+      params: { timestamp, signature },
+    });
 
     const responseData = {
       ...response.data,
       //trazer o balance que o free for maior que 0.00000000
-      balances: response.data.balances.filter((balance: any) => parseFloat(balance.free) > 0.00000000),
+      balances: response.data.balances.filter(
+        (balance: any) => parseFloat(balance.free) > 0.0
+      ),
     };
 
     return responseData;
@@ -36,5 +35,10 @@ export default async function getSpotWallet() {
       "Erro ao consultar o saldo:",
       error.response?.data || error.message
     );
+    await saveErrorNotification(error.message || String(error));
+    // (Opcional) Notifica via Telegram ou outro canal de alerta
+    await AlertTele(`❌ Erro ao consultar saldo:
+${error instanceof Error ? error.message : String(error)}`);
+    throw error;
   }
-};
+}

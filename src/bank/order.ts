@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import axios from "axios";
+import { saveErrorNotification } from "../database/errorNotification.ts";
+import AlertTele from "../sms/telegram.ts";
 
 
 /**
@@ -53,6 +55,10 @@ export default async function newOrden(quantity: string, side: string): Promise<
     return true;
   } catch (error) {
     console.error("Erro ao salvar no banco de dados:", error);
+    await saveErrorNotification(error.message || String(error));
+    // (Opcional) Notifica via Telegram ou outro canal de alerta
+    await AlertTele(`❌ Erro ao salvar registro no banco:
+${error instanceof Error ? error.message : String(error)}`);  
     return false;
   }
 }

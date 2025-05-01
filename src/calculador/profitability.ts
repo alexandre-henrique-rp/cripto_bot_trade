@@ -11,6 +11,10 @@ export default function calcularLucro(
   dataCompra: Date,
   tipoOperacao: "compra" | "venda"
 ): number {
+
+  if(!precoCompra){
+    precoCompra = 0;
+  }
   const lucroInicialPercentual = 0.1; // 10%
   const reducaoAbsoluta = 0.01; // reduz 1% absoluto a cada 30min
   const tempoSemReducao = 4 * 60 * 60 * 1000; // 4h
@@ -39,6 +43,5 @@ export default function calcularLucro(
   }
 
   const valorFinal = precoCompra * (1 + lucroFinalPercentual);
-  console.log("🚀 ~ lucroFinalPercentual:", lucroFinalPercentual)
   return Number(valorFinal.toFixed(2));
 }

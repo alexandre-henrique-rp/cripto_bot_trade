@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { saveErrorNotification } from "./errorNotification.ts";
+import AlertTele from "../sms/telegram.ts";
 
 const Prisma = new PrismaClient();
 
@@ -26,6 +28,9 @@ export default async function POST_VENDA(sales: Sales): Promise<Sales | null> {
     return result;
   } catch (error) {
     console.log(error);
+    await saveErrorNotification(error.message || String(error));
+    // (Opcional) Notifica via Telegram ou outro canal de alerta
+    await AlertTele(`❌ Erro ao salvar registro no banco:\n${error instanceof Error ? error.message : String(error)}`);
     return null;
   }
 }

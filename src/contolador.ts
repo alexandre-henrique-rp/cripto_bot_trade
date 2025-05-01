@@ -7,15 +7,24 @@ import UPDATE_DB from "./database/update.ts";
 import formatarMoeda from "./lib/format_moeda.ts";
 import AlertTele from "./sms/telegram.ts";
 import POST_VENDA from "./database/postSalles.ts";
+import { saveErrorNotification, getLastErrorNotification } from "./database/errorNotification.ts";
+
+// Função utilitária para ajustar a quantidade para o número de casas decimais permitido pela corretora
+function ajustarQuantidade(quantidade: number, casasDecimais: number = 3): number {
+  const fator = Math.pow(10, casasDecimais);
+  return Math.floor(quantidade * fator) / fator;
+}
 
 const template = {
   min_price: 1791.61,
   max_price: 2229.97,
-  media_minima: 1941.48,
+  media_minima: 1821.48,
   media_maxima: 2034.31,
 };
 
 export default async function Controlador(currentPrise: number) {
+  console.log("✅ Controlador executado com sucesso!");
+  console.log("🟢 Devemos comprar quando o preço atual for menor ou igual a ", template.media_minima);
   try {
     const walletDb = await GET_DB();
     const sellPrice = walletDb?.sellPrice || false;
@@ -24,113 +33,93 @@ export default async function Controlador(currentPrise: number) {
     const quantity = walletDb?.quantity || 0;
     const price_venda = calcularLucro(priceCompra, DateCompra, "venda");
     console.log("🚀 ~ Controlador ~ price_venda:", price_venda)
+    // const price_venda = 1847.40;
     const symbol = process.env.SYMBOL || "";
 
-    if (!sellPrice && currentPrise < template.media_minima) {
+
+    // --- Lógica de COMPRA ---
+    // Só realiza a compra se:
+    // - Não está em modo de venda (sellPrice === false)
+    // - O preço atual for menor OU IGUAL à média mínima definida
+    if (!sellPrice && currentPrise <= template.media_minima) {
+      console.log("🟢 Tentando comprar...");
+      // Consulta o saldo de USDT disponível
       const walletSpot = await getSpotWallet();
-      // Ensure usdt is a number by using parseFloat
-      const usdt = parseFloat(
-        walletSpot?.balances.find((balance: any) => balance.asset === "USDT")
-          ?.free || "0"
-      );
-      if (usdt > 0) {
-        const cryptoSerComprado = usdt / currentPrise;
-        console.log("🔍 Original quantity:", cryptoSerComprado);
-        
-        // For ETH on Binance, the minimum quantity is 0.001 and step size is 0.001
-        // Round down to nearest valid step size
-        const minQuantity = 0.00001;
-        const stepSize = 0.001;
-        const validQuantity = Math.floor(cryptoSerComprado / stepSize) * stepSize;
-        console.log("🔍 Valid quantity after step size adjustment:", validQuantity);
-        
-        // Check if the quantity meets the minimum requirement
-        const roundedQuantity = validQuantity >= minQuantity ? validQuantity : 0;
-        console.log("🔍 Final rounded quantity:", roundedQuantity, "Meets minimum?", roundedQuantity >= minQuantity);
-        
-        // Only proceed if we have enough to meet minimum order size
-        if (roundedQuantity >= minQuantity) {
-          console.log("🔍 Attempting to place buy order with quantity:", roundedQuantity);
-          const compraDeCripto = await newOrden(`${roundedQuantity}`, "BUY");
-          console.log("🚀 ~ Controlador ~ compraDeCripto:", compraDeCripto)
-          if (compraDeCripto) {
-            await POST_DB({
-              symbol: symbol,
-              price: currentPrise,
-              quantity: roundedQuantity,
-              sellPrice: true,
-              usd: parseFloat(usdt.toFixed(2)),
-            });
-            const ValorDeVenda = calcularLucro(
-              currentPrise,
-              new Date(),
-              "compra"
-            );
-            const message = `Bot:\n\nEstou comprando Ethereum no valor de : ${formatarMoeda(
-              usdt
-            )} dollar,\ncom a quantidade de : ${roundedQuantity} ETH,\no valor atual do ETH e : ${formatarMoeda(
-              currentPrise
-            )} dollar,\naguardando para vender quando ETH atingir : ${formatarMoeda(
-              ValorDeVenda
-            )} dollar\n\n${new Date().toLocaleDateString(
-              "pt-BR"
-            )} as ${new Date().toLocaleTimeString("pt-BR")}`;
-            await AlertTele(message);
-            console.log("✅ Compra realizada com sucesso!");
-          } else {
-            console.log("❌ Falha ao executar a ordem de compra");
-          }
+      const usdt = parseFloat(walletSpot?.balances.find((b: any) => b.asset === "USDT")?.free || "0");
+      console.log("🚀 ~ Controlador ~ usdt:", usdt)
+      // Só compra se tiver mais de 2 USDT disponíveis
+      if (usdt > 2) {
+        // Compra TODO o saldo disponível de USDT
+        const quantidadeCompra = usdt / currentPrise;
+        const quantidadeAjustada = ajustarQuantidade(quantidadeCompra, 3); // 3 casas decimais para ETH
+        console.log("🟢 Quantidade ajustada para compra:", quantidadeAjustada);
+        const compraDeCripto = await newOrden(`${quantidadeAjustada}`, "BUY");
+        console.log("🟢 Resultado da compraDeCripto:", compraDeCripto);
+        if (compraDeCripto) {
+          // Consulta saldo real da moeda comprada após a ordem
+          const walletSpotAtualizada = await getSpotWallet();
+          const moedaComprada = symbol.replace("USDT", "");
+          const saldoMoeda = walletSpotAtualizada.balances.find((b: any) => b.asset === moedaComprada);
+          const saldoReal = saldoMoeda?.free || '0';
+          console.log("🟢 Saldo real da moeda após compra:", saldoReal);
+          // Salva no banco a quantidade REAL adquirida
+          await POST_DB({
+            symbol: symbol,
+            price: currentPrise,
+            quantity: saldoReal.toString(),
+            sellPrice: true,
+            usd: usdt,
+          });
+          console.log("✅ Registro de compra salvo no banco!");
+          // Alerta via Telegram
+          await AlertTele(`✅ Compra realizada!\nMoeda: ${symbol}\nQuantidade: ${saldoReal.toString}\nValor investido: ${formatarMoeda(usdt)}\nPreço atual: ${formatarMoeda(currentPrise)}`);
         } else {
-          // Not enough USDT to meet minimum order size
-          const usdtNeeded = minQuantity * currentPrise;
-          console.log(`⚠️ USDT insuficiente para compra. Disponível: ${usdt}, Necessário: ${usdtNeeded} (para ${minQuantity} ETH)`);
-          
-          // Only send Telegram alert if we're not in a test environment
-          // This helps avoid rate limiting during testing
-          if (process.env.NODE_ENV === 'production') {
-            try {
-              await AlertTele(`⚠️ USDT insuficiente para compra. Disponível: ${formatarMoeda(usdt)}, Necessário: ${formatarMoeda(usdtNeeded)} (para ${minQuantity} ETH)`);
-            } catch (error) {
-              console.log("⚠️ Não foi possível enviar alerta para o Telegram:", error.message);
-            }
-          }
+          throw new Error("Falha ao executar ordem de compra");
         }
       }
+    // --- Lógica de VENDA ---
     } else if (sellPrice && currentPrise >= price_venda) {
-      // For ETH on Binance, the minimum quantity is 0.001 and step size is 0.001
-      const minQuantity = 0.001;
-      const stepSize = 0.001;
-      const validQuantity = Math.floor(quantity / stepSize) * stepSize;
-      
-      // Check if the quantity meets the minimum requirement
-      const roundedQuantity = validQuantity >= minQuantity ? validQuantity : 0;
-      
-      // Only proceed if we have enough to meet minimum order size
-      if (roundedQuantity >= minQuantity) {
-        const vendaDeCripto = await newOrden(`${roundedQuantity}`, "SELL");
+      // Consulta saldo real da moeda antes de vender
+      const walletSpotAtualizada = await getSpotWallet();
+      const moedaComprada = symbol.replace("USDT", "");
+      const saldoMoeda = walletSpotAtualizada.balances.find((b: any) => b.asset === moedaComprada);
+      const saldoReal = saldoMoeda ? parseFloat(saldoMoeda.free) : 0;
+      const quantidadeAjustadaVenda = ajustarQuantidade(saldoReal, 3); // 3 casas decimais para ETH
+      if (quantidadeAjustadaVenda > 0) {
+        const vendaDeCripto = await newOrden(`${quantidadeAjustadaVenda}`, "SELL");
         if (vendaDeCripto) {
-          await UPDATE_DB({
-            id: walletDb.id,
-            sellPrice: false,
-          });
+          await UPDATE_DB({ id: walletDb.id, sellPrice: false });
           await POST_VENDA({
             symbol: symbol,
-            lucro: parseFloat((roundedQuantity * currentPrise - roundedQuantity * priceCompra).toFixed(2)),
+            lucro: parseFloat(((quantidadeAjustadaVenda * currentPrise) - (quantidadeAjustadaVenda * priceCompra)).toFixed(2)),
           });
-          const message = `Bot:\n\n estou Vendendo Ethereum no valor de : ${formatarMoeda(
-            roundedQuantity * currentPrise
-          )} dollar,\ncom a quantidade de : ${roundedQuantity} ETH,\nlucrando : ${formatarMoeda(
-            roundedQuantity * currentPrise - roundedQuantity * priceCompra
-          )} dollar\n\n${new Date().toLocaleDateString(
-            "pt-BR"
-          )} as ${new Date().toLocaleTimeString("pt-BR")}`;
-          await AlertTele(message);
+          await AlertTele(`✅ Venda realizada!\nMoeda: ${symbol}\nQuantidade: ${quantidadeAjustadaVenda}\nValor recebido: ${formatarMoeda(quantidadeAjustadaVenda * currentPrise)}\nPreço de venda: ${formatarMoeda(currentPrise)}`);
+        } else {
+          throw new Error("Falha ao executar ordem de venda");
         }
       }
-    } else {
-      console.log("🛌  ~ Aguardando");
     }
-  } catch (error) {
-    console.log(error);
+  } catch (error: any) {
+    // --- Controle de notificação de erro ---
+    try {
+      const lastError = await getLastErrorNotification();
+      const agora = new Date();
+      let podeNotificar = true;
+      if (lastError && lastError.createdAt) {
+        const diffMs = agora.getTime() - new Date(lastError.createdAt).getTime();
+        const diffHoras = diffMs / (1000 * 60 * 60);
+        if (diffHoras < 2) {
+          podeNotificar = false;
+        }
+      }
+      if (podeNotificar) {
+        await saveErrorNotification(error.message || String(error));
+        await AlertTele(`⚠️ Erro no bot:\n${error.message || String(error)}`);
+      } else {
+        console.log("Erro ocorrido, mas notificação já enviada nas últimas 2h.");
+      }
+    } catch (e) {
+      console.log("Erro ao tentar notificar erro:", e);
+    }
   }
 }

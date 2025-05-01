@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import axios from "axios";
+import { saveErrorNotification } from "../database/errorNotification.ts";
+import AlertTele from "../sms/telegram.ts";
 
 
 /**
@@ -37,6 +39,10 @@ export default async function getWalletBalance(): Promise<any> {
       "Erro ao consultar o saldo:",
       error.response?.data || error.message
     );
+    await saveErrorNotification(error.message || String(error));
+    // (Opcional) Notifica via Telegram ou outro canal de alerta
+    await AlertTele(`❌ Erro ao consultar saldo:
+${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
 };

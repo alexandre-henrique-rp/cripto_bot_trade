@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { saveErrorNotification } from "./errorNotification.ts";
+import AlertTele from "../sms/telegram.ts";
 
 const Prisma = new PrismaClient();
 
@@ -6,7 +8,7 @@ interface Wallet {
   id: string;
   symbol: string | null;
   price: number | null;
-  quantity: number | null;
+  quantity: string | null;
   usd: number | null;
   sellPrice: boolean;
   createdAt: Date;
@@ -42,6 +44,9 @@ export default async function GET_DB(): Promise<Wallet> {
     return result;
   } catch (error) {
     console.log(error);
+    await saveErrorNotification(error.message || String(error));
+    // (Opcional) Notifica via Telegram ou outro canal de alerta
+    await AlertTele(`❌ Erro ao buscar registro no banco:\n${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
 }

@@ -1,4 +1,6 @@
 import axios from "axios";
+import { saveErrorNotification } from "../database/errorNotification.ts";
+import AlertTele from "../sms/telegram.ts";
 
 /**
  * Buscar o valor atual de uma criptomoeda, considerando a quantidade.
@@ -32,6 +34,10 @@ export default async function getCurrentPrice(
       "Erro ao buscar o preço atual:",
       error.response?.data || error.message
     );
+    await saveErrorNotification(error.message || String(error));
+    // (Opcional) Notifica via Telegram ou outro canal de alerta
+    await AlertTele(`❌ Erro ao buscar preço atual:
+${error instanceof Error ? error.message : String(error)}`);
     throw error;
   }
 }
