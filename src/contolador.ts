@@ -8,6 +8,7 @@ import formatarMoeda from "./lib/format_moeda.ts";
 import AlertTele from "./sms/telegram.ts";
 import POST_VENDA from "./database/postSalles.ts";
 import { saveErrorNotification, getLastErrorNotification } from "./database/errorNotification.ts";
+import GET_CONFIG from "./database/config.ts";
 
 // Função utilitária para ajustar a quantidade para o número de casas decimais permitido pela corretora
 function ajustarQuantidade(quantidade: number, casasDecimais: number = 3): number {
@@ -15,46 +16,40 @@ function ajustarQuantidade(quantidade: number, casasDecimais: number = 3): numbe
   return Math.floor(quantidade * fator) / fator;
 }
 
-const template = {
-  min_price: 1791.61,
-  max_price: 2229.97,
-  media_minima: 1821.48,
-  media_maxima: 2034.31,
-};
 
 export default async function Controlador(currentPrise: number) {
   console.log("✅ Controlador executado com sucesso!");
-  console.log("🟢 Devemos comprar quando o preço atual for menor ou igual a ", template.media_minima);
   try {
     const walletDb = await GET_DB();
+    const configDb = await GET_CONFIG();
     const sellPrice = walletDb?.sellPrice || false;
     const priceCompra = walletDb?.price || 0;
     const DateCompra = walletDb?.createdAt || new Date();
-    const quantity = walletDb?.quantity || 0;
     const price_venda = calcularLucro(priceCompra, DateCompra, "venda");
-    console.log("🚀 ~ Controlador ~ price_venda:", price_venda)
-    // const price_venda = 1847.40;
-    const symbol = process.env.SYMBOL || "";
+    if(!priceCompra){
+      console.log("🟢 Devemos comprar quando o preço atual for menor ou igual a ", configDb?.taxa_min);
+    }
+    if(priceCompra){
+      console.log("🟢 Devemos vender quando o preço atual for maior ou igual a ", price_venda);
+    }
+    const symbol = configDb?.symbol || process.env.SYMBOL || "";
 
 
     // --- Lógica de COMPRA ---
     // Só realiza a compra se:
     // - Não está em modo de venda (sellPrice === false)
     // - O preço atual for menor OU IGUAL à média mínima definida
-    if (!sellPrice && currentPrise <= template.media_minima) {
+    if (!sellPrice && currentPrise <= configDb?.taxa_min) {
       console.log("🟢 Tentando comprar...");
       // Consulta o saldo de USDT disponível
       const walletSpot = await getSpotWallet();
       const usdt = parseFloat(walletSpot?.balances.find((b: any) => b.asset === "USDT")?.free || "0");
-      console.log("🚀 ~ Controlador ~ usdt:", usdt)
       // Só compra se tiver mais de 2 USDT disponíveis
       if (usdt > 2) {
         // Compra TODO o saldo disponível de USDT
         const quantidadeCompra = usdt / currentPrise;
         const quantidadeAjustada = ajustarQuantidade(quantidadeCompra, 3); // 3 casas decimais para ETH
-        console.log("🟢 Quantidade ajustada para compra:", quantidadeAjustada);
         const compraDeCripto = await newOrden(`${quantidadeAjustada}`, "BUY");
-        console.log("🟢 Resultado da compraDeCripto:", compraDeCripto);
         if (compraDeCripto) {
           // Consulta saldo real da moeda comprada após a ordem
           const walletSpotAtualizada = await getSpotWallet();
@@ -72,7 +67,7 @@ export default async function Controlador(currentPrise: number) {
           });
           console.log("✅ Registro de compra salvo no banco!");
           // Alerta via Telegram
-          await AlertTele(`✅ Compra realizada!\nMoeda: ${symbol}\nQuantidade: ${saldoReal.toString}\nValor investido: ${formatarMoeda(usdt)}\nPreço atual: ${formatarMoeda(currentPrise)}`);
+          await AlertTele(`✅ Compra realizada!\nMoeda: ${symbol}\nQuantidade: ${saldoReal}\nValor investido: ${formatarMoeda(usdt)}\nPreço atual: ${formatarMoeda(currentPrise)}`);
         } else {
           throw new Error("Falha ao executar ordem de compra");
         }
@@ -98,7 +93,10 @@ export default async function Controlador(currentPrise: number) {
           throw new Error("Falha ao executar ordem de venda");
         }
       }
+    } else {
+      console.log("🔴 Nenhuma ação necessária.");
     }
+
   } catch (error: any) {
     // --- Controle de notificação de erro ---
     try {
