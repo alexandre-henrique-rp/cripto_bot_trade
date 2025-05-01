@@ -11,11 +11,9 @@ const Bot = new Telegraf(token);
 
 Bot.on('text', async (ctx) => {
   const sms = ctx.update.message.text;
-  console.log('🚀 ~ file: index.ts:92 ~ Bot.on ~ ctx:', sms)
   if (sms === "#RELATORIO") {
     const walletDb = await GET_DB();
     const configDb = await GET_CONFIG();
-    console.log("🚀 ~ Bot.on ~ walletDb:", walletDb)
 
     const symbol = walletDb.symbol || process.env.SYMBOL || "";
     const priceCompra = walletDb.price || 0;
@@ -64,6 +62,7 @@ Bot.on('text', async (ctx) => {
       `• *Valor se vendesse agora:* ${formatarMoeda(valorAtual, 'USD')}\n` +
       `• *Ganho/Perda em relação ao investido:* ${formatarMoeda(resultadoFinal, 'USD')} (${resultadoPercentual.toFixed(2)}%)\n`;
 
+    console.log("🚀 ~ Bot.on ~ msg:", msg)
     await ctx.replyWithMarkdown(msg);
   }
 })
