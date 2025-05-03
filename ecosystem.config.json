@@ -2,7 +2,8 @@
   "apps": [
     {
       "name": "bot_cripto",
-      "script": "npm run start"
+      "script": "npm run start",
+      "watch": true
     }
   ]
 }
