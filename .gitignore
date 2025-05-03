@@ -4,6 +4,7 @@ node_modules
 yarn.lock
 package-lock.json
 prisma/db
+prisma/migrations
 new
 migrations
 .vscode

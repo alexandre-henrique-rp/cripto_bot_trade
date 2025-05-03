@@ -6,9 +6,8 @@
   "scripts": {
     "start": "node --experimental-strip-types -r dotenv/config index.ts",
     "dev": "node --watch --experimental-strip-types -r dotenv/config index.ts",
-    "get": "node --experimental-strip-types -r dotenv/config get.ts",
-    "teste": "yarn start && yarn telegran",
-    "telegran": "node --experimental-strip-types -r dotenv/config telegranRequest.ts"
+    "start:config": "node --experimental-strip-types -r dotenv/config confg_init.ts",
+    "db": "prisma db push"
   },
   "keywords": [],
   "author": "",
