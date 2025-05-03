@@ -79,16 +79,20 @@ export default async function Controlador(currentPrise: number) {
       const moedaComprada = symbol.replace("USDT", "");
       const saldoMoeda = walletSpotAtualizada.balances.find((b: any) => b.asset === moedaComprada);
       const saldoReal = saldoMoeda ? parseFloat(saldoMoeda.free) : 0;
-      const quantidadeAjustadaVenda = ajustarQuantidade(saldoReal, 3); // 3 casas decimais para ETH
-      if (quantidadeAjustadaVenda > 0) {
-        const vendaDeCripto = await newOrden(`${quantidadeAjustadaVenda}`, "SELL");
+      if (saldoReal > 0) {
+        const vendaDeCripto = await newOrden(`${saldoReal}`, "SELL");
         if (vendaDeCripto) {
           await UPDATE_DB({ id: walletDb.id, sellPrice: false });
           await POST_VENDA({
             symbol: symbol,
-            lucro: parseFloat(((quantidadeAjustadaVenda * currentPrise) - (quantidadeAjustadaVenda * priceCompra)).toFixed(2)),
+            lucro: String((saldoReal * currentPrise) - (saldoReal * priceCompra)),
+            valor_recebido: String((saldoReal * currentPrise)),
+            valor_investido: String((saldoReal * priceCompra)),
+            quantidade: String(saldoReal),
+            price_compra: String(priceCompra),
+            price_venda: String(currentPrise),
           });
-          await AlertTele(`✅ Venda realizada!\nMoeda: ${symbol}\nQuantidade: ${quantidadeAjustadaVenda}\nValor recebido: ${formatarMoeda(quantidadeAjustadaVenda * currentPrise)}\nPreço de venda: ${formatarMoeda(currentPrise)}`);
+          await AlertTele(`✅ Venda realizada!\nMoeda: ${symbol}\nQuantidade: ${saldoReal}\nValor recebido: ${formatarMoeda(saldoReal * currentPrise)}\nPreço de venda: ${formatarMoeda(currentPrise)}`);
         } else {
           throw new Error("Falha ao executar ordem de venda");
         }

@@ -43,5 +43,6 @@ export default function calcularLucro(
   }
 
   const valorFinal = precoCompra * (1 + lucroFinalPercentual);
+  console.log("🚀 ~ calcularLucro ~ valorFinal:", lucroFinalPercentual)
   return Number(valorFinal.toFixed(2));
 }

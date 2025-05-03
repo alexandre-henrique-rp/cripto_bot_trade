@@ -5,7 +5,8 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "start": "node --experimental-strip-types -r dotenv/config index.ts"
+    "start": "node --experimental-strip-types -r dotenv/config index.ts",
+    "dev": "node --watch --experimental-strip-types -r dotenv/config index.ts"
   },
   "dependencies": {
     "telegraf": "^4.16.3",

@@ -21,7 +21,12 @@ model Wallet {
 model sales {
   id          String    @id @default(cuid())
   symbol      String?
-  lucro       Float?
+  lucro       String?
+  valor_recebido String?
+  valor_investido String?
+  quantidade String?
+  price_compra String?
+  price_venda String?
   createdAt   DateTime  @default(now())
 }
   
