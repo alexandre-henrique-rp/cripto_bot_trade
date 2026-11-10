@@ -11,7 +11,7 @@
     "start:config": "node --experimental-strip-types -r dotenv/config confg_init.ts",
     "db": "prisma db push",
     "generate": "prisma generate",
-    "test": "node --test --experimental-strip-types src/lib/symbol.test.ts bot/src/carteira.test.ts src/bank/syncPosition.test.ts src/config/security.test.ts src/sms/notificacoes.test.ts"
+    "test": "node --test --experimental-strip-types src/lib/symbol.test.ts bot/src/carteira.test.ts bot/src/atualizar.test.ts src/bank/syncPosition.test.ts src/config/security.test.ts src/sms/notificacoes.test.ts"
   },
   "keywords": [],
   "author": "Alexandre Henrique",

@@ -27,6 +27,7 @@ import carteira from "./src/carteira.ts";
 import media from "./src/media.ts";
 import venda from "./src/venda.ts";
 import status from "./src/status.ts";
+import atualizar from "./src/atualizar.ts";
 import mostrarConfig from "./src/config.ts";
 import { verificar, iniciar, parar, assumirPosicao } from "./src/controle.ts";
 import { UPDATE_CONFIG } from "../src/database/config.ts";
@@ -127,6 +128,8 @@ Bot.command("ajuda", (ctx) => reply(ctx, ajuda()));
 
 Bot.command("saldo", async (ctx) => reply(ctx, await saldo()));
 Bot.command("carteira", async (ctx) => reply(ctx, await carteira()));
+Bot.command("atualizar", async (ctx) => reply(ctx, await atualizar()));
+Bot.command("sincronizar", async (ctx) => reply(ctx, await atualizar()));
 Bot.command("media", async (ctx) => reply(ctx, await media()));
 Bot.command("venda", async (ctx) => reply(ctx, await venda()));
 Bot.command("status", async (ctx) => reply(ctx, await status()));

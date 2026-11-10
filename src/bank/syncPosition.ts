@@ -9,6 +9,8 @@ import AlertTele from "../sms/telegram.ts";
 import formatarMoeda from "../lib/format_moeda.ts";
 import { ajustarQuantidadePorSimbolo } from "../lib/symbol.ts";
 
+import { getMonitorState, setMonitorState } from "../database/monitorState.ts";
+
 // Valor mínimo em USD para considerar que existe uma posição real na carteira
 // (ignora "poeira" / frações residuais que a Binance não permite vender).
 export const MIN_POSICAO_USD = 5;
@@ -107,22 +109,27 @@ async function buscarUltimoPrecoCompraBinance(
   }
 }
 
+export interface ResultadoSync {
+  assumiu: boolean;
+  posicaoLiberada?: boolean;
+  quantidade: number;
+  precoCompra: number;
+  walletId: string;
+}
+
 /**
  * Verifica na Binance se já existe saldo da cripto quando o banco local diz
  * que não há compra em aberto. Se encontrar saldo relevante, importa para a
  * tabela Wallet para que o bot passe a monitorar a VENDA daquele saldo.
+ * Se não houver saldo mas o banco tinha compra aberta (venda manual na Binance),
+ * libera o banco e reseta para monitorar nova COMPRA.
  */
 export async function sincronizarPosicaoExistente(
   symbol: string,
   currentPrice: number,
   forcarVerificacao: boolean = false,
   precoManual?: number
-): Promise<{
-  assumiu: boolean;
-  quantidade: number;
-  precoCompra: number;
-  walletId: string;
-} | null> {
+): Promise<ResultadoSync | null> {
   const agora = Date.now();
   if (!forcarVerificacao && agora - ultimaVerificacaoMs < INTERVALO_SYNC_MS) {
     return null;
@@ -137,8 +144,24 @@ export async function sincronizarPosicaoExistente(
 
   const avaliacao = avaliarPosicaoCarteira(saldoLivre, symbol, currentPrice);
   if (!avaliacao.assumir) {
+    // Se o banco local achava que tinha cripto comprada, mas o saldo na Binance é < MIN_POSICAO_USD,
+    // significa que a moeda foi vendida manualmente na Binance!
+    const walletAtual = await GET_DB(symbol);
+    let posicaoLiberada = false;
+    if (walletAtual?.id && walletAtual.sellPrice === true) {
+      await UPDATE_DB({ id: walletAtual.id, sellPrice: false });
+      const monitor = await getMonitorState();
+      await setMonitorState(monitor.id, {
+        phase: "IDLE",
+        extremePrice: null,
+        lastPrice: currentPrice,
+      });
+      posicaoLiberada = true;
+    }
+
     return {
       assumiu: false,
+      posicaoLiberada,
       quantidade: avaliacao.quantidadeAjustada,
       precoCompra: 0,
       walletId: "",

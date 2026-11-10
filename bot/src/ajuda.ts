@@ -7,6 +7,7 @@ export default function ajuda(): string {
     `🤖 Comandos do Bot de Trade\n\n` +
     `📊 CONSULTA\n` +
     `/ajuda — mostra esta lista de comandos\n` +
+    `/atualizar — consulta a Binance na hora, sincroniza vendas/compras manuais e recalcula a estratégia\n` +
     `/saldo — saldo em USDT (dólar) e na cripto do par atual\n` +
     `/carteira — lista todas as moedas com saldo na sua carteira Binance Spot e o total em USD\n` +
     `/media — médias da janela (máx alta, média venda, média mínima, mín) e preço atual\n` +
