@@ -1,30 +1,31 @@
 {
-  "name": "cripto",
+  "name": "cripto-bot",
   "version": "1.0.0",
   "main": "index.js",
   "type": "module",
   "scripts": {
     "start": "node --experimental-strip-types -r dotenv/config index.ts",
+    "start:bot": "node --experimental-strip-types -r dotenv/config bot/index.ts",
     "dev": "node --watch --experimental-strip-types -r dotenv/config index.ts",
+    "dev:bot": "node --watch --experimental-strip-types -r dotenv/config bot/index.ts",
     "start:config": "node --experimental-strip-types -r dotenv/config confg_init.ts",
-    "db": "prisma db push"
+    "db": "prisma db push",
+    "generate": "prisma generate",
+    "test": "node --test --experimental-strip-types src/lib/symbol.test.ts bot/src/carteira.test.ts src/bank/syncPosition.test.ts src/config/security.test.ts src/sms/notificacoes.test.ts"
   },
   "keywords": [],
-  "author": "",
+  "author": "Alexandre Henrique",
   "license": "ISC",
-  "description": "",
+  "description": "Bot de trading para Binance",
   "dependencies": {
-    "@prisma/client": "^6.5.0",
-    "axios": "^1.8.4",
-    "decimal.js": "^10.5.0",
-    "dotenv": "^16.4.7",
-    "telegraf": "^4.16.3",
-    "ws": "^8.18.1"
+    "@prisma/client": "6.19.3",
+    "dotenv": "16.6.1",
+    "prisma": "6.19.3",
+    "telegraf": "4.16.3",
+    "ws": "8.21.3"
   },
   "devDependencies": {
-    "@types/node-fetch": "^2.6.12",
-    "@types/ws": "^8.18.0",
-    "prisma": "^6.5.0"
+    "@types/ws": "8.18.1"
   },
   "packageManager": "yarn@1.22.22+sha512.a6b2f7906b721bba3d67d4aff083df04dad64c399707841b7acf00f6b133b7ac24255f2652fa22ae3534329dc6180534e98d17432037ff6fd140556e2bb3137e"
 }

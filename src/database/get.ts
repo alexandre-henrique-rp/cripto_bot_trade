@@ -21,10 +21,11 @@ interface Wallet {
  * @throws {Error} - Se houver um erro na requisição.
  *
  */
-export default async function GET_DB(): Promise<Wallet> {
+export default async function GET_DB(symbol?: string): Promise<Wallet> {
   try {
     const result = await Prisma.wallet.findFirst({
-      orderBy: { id: 'desc' },
+      where: symbol ? { symbol } : undefined,
+      orderBy: { createdAt: 'desc' },
     });
     
     if (!result) {

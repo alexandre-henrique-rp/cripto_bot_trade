@@ -1,0 +1,16 @@
+node_modules
+bot/node_modules
+npm-debug.log
+.env
+.env.dev
+.git
+.gitignore
+.vscode
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+prisma/db
+prisma/migrations
+bot/error
+README.md

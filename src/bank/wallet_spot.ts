@@ -1,12 +1,10 @@
 import crypto from "crypto";
-import axios from "axios";
-import { saveErrorNotification } from "../database/errorNotification.ts";
-import AlertTele from "../sms/telegram.ts";
+import { httpGet } from "../lib/http.ts";
+import { getBinanceCredentials } from "../config/vault.ts";
+import { notificarErroTelegram } from "../sms/notificacoes.ts";
 
 export default async function getSpotWallet() {
-  const apiKey = process.env.API_KEY_PROD || "";
-  const secretKey = process.env.SECRET_KEY_PROD || "";
-  const baseUrl = `${process.env.API_URL_PROD}`;
+  const { apiKey, secretKey, apiUrl: baseUrl } = getBinanceCredentials();
 
   const timestamp = Date.now();
   const queryString = `timestamp=${timestamp}`;
@@ -16,16 +14,17 @@ export default async function getSpotWallet() {
     .digest("hex");
 
   try {
-    const response = await axios.get(`${baseUrl}/v3/account`, {
+    const response = await httpGet(`${baseUrl}/v3/account`, {
       headers: { "X-MBX-APIKEY": apiKey },
       params: { timestamp, signature },
     });
 
     const responseData = {
       ...response.data,
-      //trazer o balance que o free for maior que 0.00000000
+      //trazer o balance que o free for maior que 0.00000000 (ou locked > 0)
       balances: response.data.balances.filter(
-        (balance: any) => parseFloat(balance.free) > 0.0
+        (balance: any) =>
+          parseFloat(balance.free) > 0.0 || parseFloat(balance.locked) > 0.0
       ),
     };
 
@@ -35,10 +34,7 @@ export default async function getSpotWallet() {
       "Erro ao consultar o saldo:",
       error.response?.data || error.message
     );
-    await saveErrorNotification(error.message || String(error));
-    // (Opcional) Notifica via Telegram ou outro canal de alerta
-    await AlertTele(`❌ Erro ao consultar saldo:
-${error instanceof Error ? error.message : String(error)}`);
+    await notificarErroTelegram("Consulta Saldo Spot Binance", error);
     throw error;
   }
 }

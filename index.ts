@@ -1,35 +1,78 @@
+import dotenv from "dotenv";
+// override:true garante que os valores do .env prevaleçam sobre variáveis
+// eventualmente já presentes no ambiente (evita URLs/chaves vazias herdadas).
+dotenv.config({ override: true });
+
+import {
+  inicializarCofre,
+  getBinanceCredentials,
+} from "./src/config/vault.ts";
+import { ativarNetworkGuard } from "./src/config/networkGuard.ts";
+
+// Inicializa o cofre (apagando chaves de process.env) e ativa o firewall de saída.
+inicializarCofre();
+ativarNetworkGuard();
+
+// Evita que uma rejeição ou exceção inesperada derrube o motor de trade.
+process.on("unhandledRejection", (reason) => {
+  console.error("⚠️ [trade] unhandledRejection:", reason);
+  notificarErroTelegram("Processo Trade (unhandledRejection)", reason);
+});
+process.on("uncaughtException", (err) => {
+  console.error("⚠️ [trade] uncaughtException:", err?.message || err);
+  notificarErroTelegram("Processo Trade (uncaughtException)", err);
+});
+
 import WebSocket from "ws";
 import Controlador from "./src/contolador.ts";
 import GET_CONFIG from "./src/database/config.ts";
+import { iniciarColetorCMC } from "./src/coinmarketcap/collector.ts";
+import { notificarErroTelegram } from "./src/sms/notificacoes.ts";
 
 const configDb = await GET_CONFIG();
-const url = `${
-  process.env.STREAM_URL_PROD
-}/${configDb.symbol?.toLowerCase() || process.env.SYMBOL?.toLowerCase()}@ticker`;
+const symbol =
+  process.env.SYMBOL?.toLowerCase() ||
+  configDb.symbol?.toLowerCase() ||
+  "solusdt";
+const { streamUrl } = getBinanceCredentials();
+const url = `${streamUrl}/${symbol}@ticker`;
 
-const ws = new WebSocket(url);
+// Inicia a coleta periódica de preços no CoinMarketCap (histórico p/ médias).
+iniciarColetorCMC().catch((e) =>
+  console.error("Falha ao iniciar coletor CMC:", e)
+);
 
-ws.on("message", async (ev) => {
-  console.clear();
-  const Obj = JSON.parse(ev.toString());
+function conectarWebSocket() {
+  const ws = new WebSocket(url);
 
-  if (Obj && Obj.s && Obj.a) {
-    console.log("🚀 ~ SIMBOL: ", Obj.s);
-    console.log("🚀 ~ MELHOR PREÇO DE VENDA: ", Obj.a);
-    console.log(
-      "🚀 ~ ",
-      `${new Date().toLocaleDateString(
-        "pt-BR"
-      )} as ${new Date().toLocaleTimeString("pt-BR")}`
-    );
+  ws.on("open", () => console.log("🔌 WebSocket Binance conectado:", url));
 
-    const valor_atual = parseFloat(Obj.a || "0");
-    console.log("🟢 Chamando Controlador com valor_atual:", valor_atual);
+  ws.on("message", async (ev) => {
     try {
-      await Controlador(valor_atual);
-      
+      const Obj = JSON.parse(ev.toString());
+      if (Obj && Obj.s && Obj.a) {
+        const valor_atual = parseFloat(Obj.a);
+        if (!Number.isFinite(valor_atual) || valor_atual <= 0) {
+          return;
+        }
+        await Controlador(valor_atual);
+      }
     } catch (error) {
-      console.error("❌ Erro ao executar Controlador:", error);
+      console.error("❌ Erro ao processar mensagem no Controlador:", error);
+      await notificarErroTelegram("WebSocket Mensagem", error);
     }
-  }
-});
+  });
+
+  ws.on("close", () => {
+    console.warn("⚠️ WebSocket fechado. Reconectando em 5s...");
+    setTimeout(conectarWebSocket, 5000);
+  });
+
+  ws.on("error", (err) => {
+    console.error("❌ Erro no WebSocket:", err.message);
+    notificarErroTelegram("WebSocket Binance", err);
+    ws.close();
+  });
+}
+
+conectarWebSocket();

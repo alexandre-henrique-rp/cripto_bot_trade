@@ -1,5 +1,6 @@
 import crypto from "crypto";
-import axios from "axios";
+import { httpGet } from "../lib/http.ts";
+import { getBinanceCredentials } from "../config/vault.ts";
 import { saveErrorNotification } from "../database/errorNotification.ts";
 import AlertTele from "../sms/telegram.ts";
 
@@ -12,8 +13,7 @@ import AlertTele from "../sms/telegram.ts";
  *
  */
 export default async function getWalletBalance(): Promise<any> {
-  const apiKey = process.env.API_KEY_PROD || "";
-  const secretKey = process.env.SECRET_KEY_PROD || "";
+  const { apiKey, secretKey } = getBinanceCredentials();
   const baseUrl = `https://api.binance.com`;
 
   const timestamp = Date.now();
@@ -24,7 +24,7 @@ export default async function getWalletBalance(): Promise<any> {
     .digest("hex");
 
   try {
-    const response = await axios.get(
+    const response = await httpGet(
       `${baseUrl}/sapi/v1/asset/wallet/balance`,
       {
         headers: { "X-MBX-APIKEY": apiKey },

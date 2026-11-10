@@ -1,10 +1,20 @@
 import { Telegraf } from "telegraf";
+import { getTelegramCredentials } from "../config/vault.ts";
 
-const Bot = new Telegraf(process.env.BOT_TOKEN || "");
+let botInstance: Telegraf | null = null;
+
+function obterBot(): Telegraf {
+  if (!botInstance) {
+    const { botToken } = getTelegramCredentials();
+    botInstance = new Telegraf(botToken);
+  }
+  return botInstance;
+}
 
 export default async function AlertTele(msg: string) {
   try {
-    Bot.telegram.sendMessage(process.env.CHAT_ID || "", msg);
+    const { chatId } = getTelegramCredentials();
+    await obterBot().telegram.sendMessage(chatId, msg);
   } catch (error) {
     console.log(error);
   }

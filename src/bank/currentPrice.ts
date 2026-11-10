@@ -1,6 +1,6 @@
-import axios from "axios";
-import { saveErrorNotification } from "../database/errorNotification.ts";
-import AlertTele from "../sms/telegram.ts";
+import { httpGet } from "../lib/http.ts";
+import { getBinanceCredentials } from "../config/vault.ts";
+import { notificarErroTelegram } from "../sms/notificacoes.ts";
 
 /**
  * Buscar o valor atual de uma criptomoeda, considerando a quantidade.
@@ -14,11 +14,10 @@ export default async function getCurrentPrice(
   symbol: string,
   quantity: number
 ) {
-  const apiKey = process.env.API_KEY_PROD || "";
-  const baseUrl = process.env.API_URL_PROD || "";
+  const { apiKey, apiUrl: baseUrl } = getBinanceCredentials();
 
   try {
-    const response = await axios.get(
+    const response = await httpGet(
       `${baseUrl}/v3/ticker/24hr`,
       {
         headers: { "X-MBX-APIKEY": apiKey },
@@ -34,10 +33,7 @@ export default async function getCurrentPrice(
       "Erro ao buscar o preço atual:",
       error.response?.data || error.message
     );
-    await saveErrorNotification(error.message || String(error));
-    // (Opcional) Notifica via Telegram ou outro canal de alerta
-    await AlertTele(`❌ Erro ao buscar preço atual:
-${error instanceof Error ? error.message : String(error)}`);
+    await notificarErroTelegram(`Cotação Atual (${symbol})`, error);
     throw error;
   }
 }

@@ -1,8 +1,9 @@
 node_modules
 # Keep environment variables out of version control
 .env
+.env.dev
 yarn.lock
-package-lock.json
+#package-lock.json
 prisma/db
 prisma/migrations
 new
@@ -12,3 +13,4 @@ bot/.env
 bot/yarn.lock
 bot/node_modules
 regra.txt
+docs/
