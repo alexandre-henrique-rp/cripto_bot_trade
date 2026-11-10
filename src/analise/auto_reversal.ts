@@ -6,8 +6,8 @@ import AlertTele from "../sms/telegram.ts";
 
 const Prisma = new PrismaClient();
 
-// Faixa segura para o reversal automático.
-const MIN_REVERSAL = 2;
+// Faixa segura para o reversal automático (mínimo 0.5% para mercados com baixa volatilidade).
+const MIN_REVERSAL = 0.5;
 const MAX_REVERSAL = 10;
 
 // Evita reavaliar/avisar a cada tick: no máximo 1 ajuste automático por hora.

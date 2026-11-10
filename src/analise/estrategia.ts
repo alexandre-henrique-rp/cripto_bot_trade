@@ -63,16 +63,34 @@ export function decidirReversao(
     }
 
     // MONITOR_BUY
+    // TRAVA DE SEGURANÇA 1: Se o preço atual subiu além da média geral,
+    // a oportunidade de comprar na baixa passou! Aborta o monitoramento para não comprar no topo.
+    if (precoAtual > medias.mediaGeral) {
+      return {
+        acao: "NENHUMA",
+        novoEstado: { phase: "IDLE", extremePrice: null },
+        motivo: `Preço atual (${precoAtual}) subiu além da média geral (${medias.mediaGeral.toFixed(
+          2
+        )}). Oportunidade de baixa expirou. Aguardando novo recuo para a média mínima (${medias.mediaMinima.toFixed(
+          2
+        )}).`,
+      };
+    }
+
     const fundo = Math.min(extreme ?? precoAtual, precoAtual);
-    const gatilhoSubida = fundo * (1 + fator);
+    // TRAVA DE SEGURANÇA 2: O gatilho de compra nunca pode ultrapassar a média geral.
+    // Comprar na baixa significa comprar sempre abaixo da média geral do mercado.
+    const gatilhoSubida = Math.min(fundo * (1 + fator), medias.mediaGeral);
 
     if (precoAtual >= gatilhoSubida) {
       return {
         acao: "COMPRAR",
         novoEstado: { phase: "IDLE", extremePrice: null },
-        motivo: `Reversão de alta confirmada: subiu ${reversalPercent}% do fundo ${fundo.toFixed(
+        motivo: `Reversão de alta na baixa confirmada: subiu do fundo ${fundo.toFixed(
           2
-        )} (gatilho ${gatilhoSubida.toFixed(2)}, atual ${precoAtual}).`,
+        )} até ${precoAtual} (gatilho ${gatilhoSubida.toFixed(
+          2
+        )}, abaixo da média geral ${medias.mediaGeral.toFixed(2)}).`,
       };
     }
 
@@ -81,7 +99,9 @@ export function decidirReversao(
       novoEstado: { phase: "MONITOR_BUY", extremePrice: fundo },
       motivo: `Monitorando fundo ${fundo.toFixed(
         2
-      )}. Compra se atingir ${gatilhoSubida.toFixed(2)} (+${reversalPercent}%).`,
+      )} na zona de compra. Compra se confirmar reversão em ${gatilhoSubida.toFixed(
+        2
+      )} (teto máx: média geral ${medias.mediaGeral.toFixed(2)}).`,
     };
   }
 
@@ -108,16 +128,31 @@ export function decidirReversao(
   }
 
   // MONITOR_SELL
+  // TRAVA DE SEGURANÇA 3: Se o preço despencar abaixo da média geral sem acionar topo,
+  // cancela o monitoramento de topo para não vender com prejuízo/abaixo da média geral.
+  if (precoAtual < medias.mediaGeral) {
+    return {
+      acao: "NENHUMA",
+      novoEstado: { phase: "IDLE", extremePrice: null },
+      motivo: `Preço atual (${precoAtual}) caiu abaixo da média geral (${medias.mediaGeral.toFixed(
+        2
+      )}) sem realizar no topo. Retornando para IDLE para aguardar nova alta até a média de venda (${medias.mediaVenda.toFixed(
+        2
+      )}).`,
+    };
+  }
+
   const topo = Math.max(extreme ?? precoAtual, precoAtual);
-  const gatilhoQueda = topo * (1 - fator);
+  // O gatilho de venda deve garantir realização na alta (pelo menos na média geral)
+  const gatilhoQueda = Math.max(topo * (1 - fator), medias.mediaGeral);
 
   if (precoAtual <= gatilhoQueda) {
     return {
       acao: "VENDER",
       novoEstado: { phase: "IDLE", extremePrice: null },
-      motivo: `Reversão de queda confirmada: caiu ${reversalPercent}% do topo ${topo.toFixed(
+      motivo: `Reversão de queda no topo confirmada: caiu do topo ${topo.toFixed(
         2
-      )} (gatilho ${gatilhoQueda.toFixed(2)}, atual ${precoAtual}).`,
+      )} para ${precoAtual} (gatilho ${gatilhoQueda.toFixed(2)}).`,
     };
   }
 
@@ -138,6 +173,6 @@ export function decidirReversao(
       2
     )}. Vende se cair para ${gatilhoQueda.toFixed(
       2
-    )} (-${reversalPercent}%) ou atingir ${medias.maxAlta.toFixed(2)}.`,
+    )} ou atingir a máxima ${medias.maxAlta.toFixed(2)}.`,
   };
 }
