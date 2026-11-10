@@ -7,8 +7,9 @@ import { notificarErroTelegram } from "../sms/notificacoes.ts";
  * Faz uma única coleta de preço no CoinMarketCap e salva no histórico.
  * Lê a config atual do banco a cada ciclo, então mudanças feitas pelo
  * Telegram (chave, símbolo) passam a valer no próximo ciclo.
+ * Retorna true se coletou com sucesso, false se ainda aguarda chave.
  */
-async function coletarUmaVez(): Promise<void> {
+async function coletarUmaVez(): Promise<boolean> {
   const config = await GET_CONFIG();
   const tradingSymbol = config.symbol || process.env.SYMBOL || "SOLUSDT";
   const cmcSymbol = toCmcSymbol(tradingSymbol);
@@ -19,7 +20,7 @@ async function coletarUmaVez(): Promise<void> {
     console.log(
       "⏸️ [CMC] Aguardando chave da API. Defina via /set_cmc_key no Telegram."
     );
-    return;
+    return false;
   }
 
   const price = await getCmcPrice(cmcSymbol, apiKey);
@@ -27,6 +28,7 @@ async function coletarUmaVez(): Promise<void> {
   console.log(
     `📥 [CMC] ${cmcSymbol} = $${price} salvo em ${new Date().toISOString()}`
   );
+  return true;
 }
 
 // Envia log do erro de coleta ao Telegram (com anti-spam embutido).
@@ -44,21 +46,26 @@ async function notificarErro(error: any) {
 export async function iniciarColetorCMC(): Promise<void> {
   console.log("🟢 [CMC] Coletor iniciado.");
 
-  const agendarProximo = (minutos: number) => {
-    const ms = Math.max(1, minutos) * 60 * 1000;
+  const agendarProximo = (ms: number) => {
     setTimeout(rodarCiclo, ms);
   };
 
   const rodarCiclo = async () => {
-    let intervaloMin = 5;
+    let proximaEsperaMs = 5 * 60 * 1000;
     try {
       const config = await GET_CONFIG();
-      intervaloMin = config.cmc_interval_min || 5;
-      await coletarUmaVez();
+      const intervaloMin = config.cmc_interval_min || 5;
+      const coletou = await coletarUmaVez();
+      // Se não coletou (ex: ainda sem chave), tenta novamente em 15 segundos
+      // para não fazer o usuário esperar 5 minutos após digitar a chave no Telegram.
+      proximaEsperaMs = coletou
+        ? Math.max(1, intervaloMin) * 60 * 1000
+        : 15 * 1000;
     } catch (error) {
       await notificarErro(error);
+      proximaEsperaMs = 60 * 1000; // Tenta em 1 min se houver erro transitório de rede
     } finally {
-      agendarProximo(intervaloMin);
+      agendarProximo(proximaEsperaMs);
     }
   };
 

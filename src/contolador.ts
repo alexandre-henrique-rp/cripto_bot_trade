@@ -80,8 +80,8 @@ export default async function Controlador(currentPrice: number) {
     // 1) Carrega as médias da janela de análise (24h -> até 5 dias).
     const medias = await obterMedias(symbol, config.analysis_window_days || 1);
     if (!medias) {
-      // Ainda sem histórico suficiente do CoinMarketCap para operar.
-      console.log("⏳ Coletando dados do CoinMarketCap... sem médias ainda.");
+      // Ainda sem histórico suficiente do CoinMarketCap para operar (aguardando 1ª coleta).
+      logEspera("⏳ Coletando dados do CoinMarketCap... aguardando histórico de preços (sem médias ainda).");
       return;
     }
 
