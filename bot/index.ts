@@ -1,4 +1,11 @@
+import dns from "node:dns";
+import https from "node:https";
 import dotenv from "dotenv";
+
+// Força resolução IPv4 primeiro: evita travamento de 500s do Telegraf/Docker
+// quando o container não possui rota IPv6 externa para api.telegram.org.
+dns.setDefaultResultOrder("ipv4first");
+
 // override:true garante que o .env prevaleça sobre variáveis já no ambiente.
 dotenv.config({ override: true });
 
@@ -26,7 +33,19 @@ import { UPDATE_CONFIG } from "../src/database/config.ts";
 import { notificarErroTelegram } from "../src/sms/notificacoes.ts";
 
 const { botToken: token, chatId: allowedChat } = getTelegramCredentials();
-const Bot = new Telegraf(token);
+
+// Agent HTTPS forçando IPv4 (family: 4) para não travar em containers Docker sem IPv6
+const telegramAgent = new https.Agent({
+  keepAlive: true,
+  keepAliveMsecs: 10000,
+  family: 4,
+});
+
+const Bot = new Telegraf(token, {
+  telegram: {
+    agent: telegramAgent,
+  },
+});
 
 // Evita que uma rejeição/erro não tratado derrube o processo do bot.
 process.on("unhandledRejection", (reason) => {
@@ -43,10 +62,31 @@ Bot.catch((err, ctx) => {
 });
 
 // Controle de acesso Fail-Closed: bloqueia tudo se CHAT_ID não estiver configurado
-// ou se a mensagem vier de outro chat/grupo.
+// ou se a mensagem vier de outro chat/grupo, mas registra no log para diagnóstico.
 Bot.use(async (ctx, next) => {
-  if (!allowedChat || String(ctx.chat?.id) !== String(allowedChat)) {
-    return; // ignora silenciosamente mensagens quando não autorizado
+  const chatAtual = String(ctx.chat?.id ?? "").trim();
+  const fromId = String(ctx.from?.id ?? "").trim();
+  const esperado = String(allowedChat ?? "").trim();
+  const textoMsg = (ctx.message as any)?.text || ctx.updateType;
+
+  console.log(
+    `📩 [telegram] Recebido "${textoMsg}" de chat=${chatAtual} | from=${fromId}`
+  );
+
+  if (!esperado) {
+    console.warn(
+      `⚠️ [telegram] Mensagem ignorada (chat=${chatAtual}): CHAT_ID não está definido nas variáveis de ambiente do Coolify. Configure CHAT_ID=${chatAtual}`
+    );
+    return;
+  }
+
+  // Permite se o chat atual for o CHAT_ID configurado OU se o próprio usuário (from.id)
+  // for igual ao CHAT_ID configurado (ex: falando no privado ou grupo).
+  if (chatAtual !== esperado && fromId !== esperado) {
+    console.warn(
+      `⚠️ [telegram] Mensagem ignorada: veio de chat=${chatAtual} (from=${fromId}), mas CHAT_ID configurado no Coolify é "${esperado}". Se este chat for o seu, atualize CHAT_ID=${chatAtual} no Coolify.`
+    );
+    return;
   }
   return next();
 });
@@ -220,9 +260,46 @@ Bot.command("auto_reversal", async (ctx) =>
 // Inicia o bot com retry: um erro (ex: 409 Conflict quando outra instância
 // ainda está saindo do ar) não deve derrubar o processo. Tenta de novo.
 async function iniciarBot(tentativa = 1): Promise<void> {
+  if (!token) {
+    console.error(
+      "❌ [telegram] BOT_TOKEN não está definido! Configure BOT_TOKEN nas variáveis de ambiente do Coolify."
+    );
+    return;
+  }
+  console.log(
+    `🤖 [telegram] Conectando bot ao Telegram via IPv4 (tentativa ${tentativa}) | CHAT_ID autorizado: ${
+      allowedChat || "NÃO DEFINIDO"
+    }...`
+  );
   try {
-    await Bot.launch();
-    console.log("🤖 Bot Telegram iniciado.");
+    const me = await Bot.telegram.getMe();
+    console.log(
+      `✅ [telegram] Autenticado com sucesso como @${me.username} (ID do bot: ${me.id})`
+    );
+
+    if (allowedChat) {
+      try {
+        await Bot.telegram.sendMessage(
+          allowedChat,
+          `🤖 Bot @${me.username} conectado no Coolify!\nEnvie /verificar para checar as credenciais ou /ajuda para ver os comandos.`
+        );
+        console.log(
+          `📨 [telegram] Mensagem de boas-vindas enviada com sucesso para CHAT_ID=${allowedChat}`
+        );
+      } catch (sendErr: any) {
+        console.error(
+          `⚠️ [telegram] Não foi possível enviar mensagem para CHAT_ID="${allowedChat}": ${
+            sendErr?.message || sendErr
+          }. Envie /start para @${me.username} no Telegram e veja nos logs qual é o seu chat ID correto.`
+        );
+      }
+    }
+
+    await Bot.launch({ dropPendingUpdates: false }, () => {
+      console.log(
+        "🟢 [telegram] Long-polling ativo! Bot pronto para responder comandos."
+      );
+    });
   } catch (err: any) {
     const espera = Math.min(60, tentativa * 10);
     console.error(

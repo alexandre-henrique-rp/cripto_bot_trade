@@ -25,19 +25,14 @@ RUN npx prisma generate
 # Copia o restante do código.
 COPY . .
 
-# Prepara o diretório de dados persistentes (/data), ajusta permissões
-# para o usuário não-root `node` e trava o código-fonte contra escrita em runtime.
+# Prepara o diretório de dados persistentes (/data) e trava o código-fonte contra escrita em runtime.
 RUN mkdir -p /data \
     && chmod +x docker-entrypoint.sh \
-    && chown -R node:node /app /data \
     && chmod -R a-w /app/src /app/bot /app/index.ts /app/docker-entrypoint.sh
 
 # O banco SQLite vive no volume /data (configurar Persistent Storage no Coolify).
 ENV DATABASE_URL="file:/data/crypto.db"
 VOLUME ["/data"]
-
-# Executa como usuário sem privilégios (não-root).
-USER node
 
 # tini como init garante encaminhamento de sinais para os processos node.
 ENTRYPOINT ["/usr/bin/tini", "--", "./docker-entrypoint.sh"]

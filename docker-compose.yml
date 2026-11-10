@@ -6,8 +6,6 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    cap_drop:
-      - ALL
     environment:
       - DATABASE_URL=${DATABASE_URL:-file:/data/crypto.db}
       - API_URL_PROD=${API_URL_PROD:-https://api.binance.com/api}
@@ -34,8 +32,6 @@ services:
     restart: unless-stopped
     security_opt:
       - no-new-privileges:true
-    cap_drop:
-      - ALL
     depends_on:
       app:
         condition: service_healthy

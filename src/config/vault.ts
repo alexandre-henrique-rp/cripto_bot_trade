@@ -24,6 +24,15 @@ interface SegredosCofre {
 let cofre: Readonly<SegredosCofre> | null = null;
 
 /**
+ * Remove espaços em branco e aspas acidentais (simples ou duplas)
+ * que costumam ser coladas em painéis como Coolify / .env.
+ */
+function limparValorEnv(valor?: string): string {
+  if (!valor) return "";
+  return valor.trim().replace(/^['"]+|['"]+$/g, "").trim();
+}
+
+/**
  * Inicializa o cofre lendo as variáveis de ambiente atuais e apagando
  * as credenciais sensíveis de `process.env`.
  * Idempotente: chamadas subsequentes apenas retornam o cofre já carregado,
@@ -35,12 +44,12 @@ export function inicializarCofre(forcarRecarga = false): Readonly<SegredosCofre>
   }
 
   const dados: SegredosCofre = {
-    binanceApiKey: process.env.API_KEY_PROD || "",
-    binanceSecretKey: process.env.SECRET_KEY_PROD || "",
-    binanceApiUrl: process.env.API_URL_PROD || "",
-    binanceStreamUrl: process.env.STREAM_URL_PROD || "",
-    telegramBotToken: process.env.BOT_TOKEN || "",
-    telegramChatId: process.env.CHAT_ID || "",
+    binanceApiKey: limparValorEnv(process.env.API_KEY_PROD),
+    binanceSecretKey: limparValorEnv(process.env.SECRET_KEY_PROD),
+    binanceApiUrl: limparValorEnv(process.env.API_URL_PROD) || "https://api.binance.com/api",
+    binanceStreamUrl: limparValorEnv(process.env.STREAM_URL_PROD) || "wss://stream.binance.com:9443/ws",
+    telegramBotToken: limparValorEnv(process.env.BOT_TOKEN),
+    telegramChatId: limparValorEnv(process.env.CHAT_ID),
   };
 
   cofre = Object.freeze(dados);

@@ -1,4 +1,9 @@
+import dns from "node:dns";
 import dotenv from "dotenv";
+
+// Força resolução IPv4 primeiro para evitar timeout em containers Docker sem rota IPv6
+dns.setDefaultResultOrder("ipv4first");
+
 // override:true garante que os valores do .env prevaleçam sobre variáveis
 // eventualmente já presentes no ambiente (evita URLs/chaves vazias herdadas).
 dotenv.config({ override: true });
